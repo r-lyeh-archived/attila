@@ -2,7 +2,7 @@ attila
 ======
 
 - Attila is a simple and lightweight atlas texture/image packer
-- Attila is MIT licensed.
+- Attila is BOOST licensed.
 
 ### supported input file formats
 - WebP files
