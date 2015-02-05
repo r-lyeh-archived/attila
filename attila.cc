@@ -1,17 +1,17 @@
 #include <iostream>
 
-#include "dot/dot.hpp"
+#include "deps/spot/spot.hpp"
 // CImg.h code following
-#include "dot/sample.hpp"
+#include "deps/spot/samples/cimg.h"
 #pragma comment(lib,"shell32.lib")
 #pragma comment(lib,"user32.lib")
 #pragma comment(lib,"gdi32.lib")
-void display( const dot::image &pic, const char *title = "" ) {
+void display( const spot::image &pic, const char *title = "" ) {
     if( pic.size() ) {
         cimg_library::CImg<unsigned char> ctexture( pic.w, pic.h, 1, 4, 0 );
         for( size_t y = 0; y < pic.h; ++y ) {
             for( size_t x = 0; x < pic.w; ++x ) {
-                dot::pixel pix = pic.at( x, y ).clamp().to_rgba();
+                spot::pixel pix = pic.at( x, y ).clamp().to_rgba();
                 ctexture( x, y, 0 ) = (unsigned char)(pix.r * 255.f);
                 ctexture( x, y, 1 ) = (unsigned char)(pix.g * 255.f);
                 ctexture( x, y, 2 ) = (unsigned char)(pix.b * 255.f);
@@ -22,33 +22,47 @@ void display( const dot::image &pic, const char *title = "" ) {
     }
 }
 
-#include "packers/packer.hpp"
-#include "packers/MaxRectsBinPack.h"
+#include "deps/packers/packer.hpp"
+#include "deps/packers/MaxRectsBinPack.h"
 
 #include <string>
 #include <vector>
 #include <sstream>
 #include <fstream>
+#include <utility>
+
+std::string normalize( std::string filename ) {
+    for( auto &ch : filename ) {
+        if( ch >= 'A' && ch <= 'Z' ) {
+            ch = ch - 'A' + 'a';
+        }
+        else
+        if( ch == '\\' ) {
+            ch = '/';
+        }
+    }
+    return filename;
+}
 
 struct texture {
-    std::string name;
+    std::string src, dst;
     std::vector<unsigned char> data;
 
     float w, h, x, y, u0, v0, u1, v1;
-    unsigned id, unit, is_rotated;
+    unsigned rotate;
 
-    texture() : w(0), h(0), x(0), y(0), u0(0), v0(0), u1(1), v1(1), id(0), unit(0), is_rotated(0)
+    texture() : w(0), h(0), x(0), y(0), u0(0), v0(0), u1(1), v1(1), rotate(0)
     {}
 
     bool load( const std::string &pathfile ) {
         //reset
         *this = texture();
 
-        dot::image img( pathfile );
+        spot::image img( pathfile );
         if( !img.size() )
             return false;
 
-        this->name = pathfile;
+        this->src = pathfile;
         this->w = img.w;
         this->h = img.h;
         this->data = img.rgba_data();
@@ -56,30 +70,22 @@ struct texture {
         return true;
     }
 
-    std::string debug() const {
+    std::string json( const std::string &tab = std::string() ) const {
         std::stringstream ss;
-        ss << this << std::endl;
-        ss << "\t.name: " << name << std::endl;
-        ss << "\t.data[" << data.size() << "]..." << std::endl;
-        ss << "\t.w: " << w << std::endl;
-        ss << "\t.h: " << h << std::endl;
-        ss << "\t.x: " << x << std::endl;
-        ss << "\t.y: " << y << std::endl;
-        ss << "\t.u0: " << u0 << std::endl;
-        ss << "\t.v0: " << v0 << std::endl;
-        ss << "\t.u1: " << u1 << std::endl;
-        ss << "\t.v1: " << v1 << std::endl;
-        ss << "\t.id: " << id << std::endl;
-        ss << "\t.unit: " << unit << std::endl;
-        ss << "\t.is_rotated: " << is_rotated << std::endl;
-        return ss.str();
+        ss << tab << "\"" << normalize(src) << "\": {" << std::endl;
+        ss << tab << tab << "\"src\": \"" << normalize(src) << "\", \"dst\": \"" << normalize(dst) << "\"," << std::endl;
+        ss << tab << tab << "\"x\": " << x << ", \"y\": " << y << ", \"w\": " << w << ", \"h\": " << h << "," << std::endl;
+        ss << tab << tab << "\"u0\": " << u0 << ", \"v0\": " << v0 << ", \"u1\": " << u1 << ", \"v1\": " << v1 << "," << std::endl;
+        ss << tab << tab << "\"rotate\": " << rotate << ", \"hash\": " << std::hash<std::string>()(normalize(src)) << std::endl;
+        ss << tab << "}";
+        return ss.str();        
     }
 };
 
-void warn( const std::string &a = std::string(), const std::string &b = std::string() ) {
-    if( a.size() ) std::cerr << a << ' ';
-    if( b.size() ) std::cerr << b << ' ';
-    std::cerr << std::endl;
+void warn( std::ostream &out = std::cout, const std::string &a = std::string(), const std::string &b = std::string() ) {
+    if( a.size() ) out << a << ' ';
+    if( b.size() ) out << b << ' ';
+    out << std::endl;
 }
 
 std::vector<std::string> split( std::istream &is, char delim ) {
@@ -99,7 +105,24 @@ std::vector<texture> textures;
 int main( int argc, const char **argv ) {
 
     if( argc < 3 ) {
-        warn( argv[0], "atlas_output_image.png atlas_input_image [atlas_input_image2] [...]");
+        std::cerr << std::string() + argv[0] + " v1.0.0 - lightweight atlas texture/image packer - https://github.com/r-lyeh/attila\n\n";
+        std::cerr << std::string() + "Usage:\n\t" + argv[0] + " output.img input.img [input2.img [...]]\n\n";
+        std::cerr << "Notes:\n\tA JSON table of contents (toc) is written to stdout. Redirect it to a file if needed.\n\n";
+
+        std::string sep1 = "\tInput image formats: ";
+        for( auto &fmt : spot::list_supported_inputs() ) {
+            std::cerr << sep1 << fmt;
+            sep1 = ", ";
+        }
+        std::cerr << std::endl;
+
+        std::string sep2 = "\tOutput image formats: ";
+        for( auto &fmt : spot::list_supported_outputs() ) {
+            std::cerr << sep2 << fmt;
+            sep2 = ", ";
+        }
+        std::cerr << std::endl;
+
         return -1;
     }
 
@@ -129,7 +152,7 @@ int main( int argc, const char **argv ) {
             continue;
         }
 
-        warn("cannot find", filename);
+        warn(std::cerr, "cannot find", filename);
     }
 
     if( textures.empty() ) {
@@ -154,29 +177,62 @@ int main( int argc, const char **argv ) {
 
     //mr.Init( width, height );
 
-    std::cout << "texture (" << width << 'x' << height << ") area: " << (100.0*unused_area/(width*height)) << "% free" << std::endl;
-
-    dot::image mega( width, height );
+    spot::image mega( width, height );
+    std::string ss, sep = "";
 
     for( int i = 0; i < textures.size(); ++i ) {
         //rects.push_back( mr.Insert( textures[i].w, textures[i].h, MaxRectsBinPack::RectBestShortSideFit ) );
 
-        int x, y, w, h;
-        bool is_rotated = tp->getTextureLocation(i,x,y,w,h);
         texture &t = textures[i];
+
+        int x, y, w, h;
+        t.rotate = tp->getTextureLocation(i,x,y,w,h) ? 90 : 0;
         t.x = x; t.y = y;
         t.u0 = float(  x) / width, t.u1 = float(  y) / height;
         t.v0 = float(w+x) / width, t.v1 = float(h+y) / height;
-        t.is_rotated = is_rotated;
-        // std::cout << textures[i].debug();
-        dot::image img( t.name );
-        mega = mega.paste( x, y, is_rotated ? img.rotate_left() : img );
+        t.dst = output;
+        
+        ss += sep + textures[i].json("\t");
+        sep = ",\n";
+        
+        spot::image img( t.src );
+        mega = mega.paste( x, y, t.rotate ? img.rotate_left() : img );
     }
+
+    std::cout << "{\n" << ss << "\n}\n" << std::endl; 
 
     //std::cout << "mr = " << mr.Occupancy() << std::endl;
 
-    mega.save_as_png( output );
+    auto check_ext = []( std::string file, std::string ext ) -> bool {
+        file = normalize( file );
+        ext = normalize( ext );
+        return file.size() < ext.size() ? false : file.substr( file.size() - ext.size() ) == ext;
+    };
+
+    /**/ if( check_ext( output, ".bmp" ) ) {
+        mega.save_as_bmp( output );
+    }
+    else if( check_ext( output, ".dds" ) ) {
+        mega.save_as_dds( output );
+    }
+    else if( check_ext( output, ".jpg" ) ) {
+        mega.save_as_jpg( output, 70 );
+    }
+    else if( check_ext( output, ".png" ) ) {
+        mega.save_as_png( output );
+    }
+    else if( check_ext( output, ".tga" ) ) {
+        mega.save_as_tga( output );
+    }
+    else if( check_ext( output, ".webp" ) ) {
+        mega.save_as_webp( output, 70 );
+    }
+    else {
+        mega.save_as_png( output );
+    }
 
     TEXTURE_PACKER::releaseTexturePacker( tp );
+
+    std::cerr << "[ OK ] Attila - Texture (" << width << 'x' << height << ") area: " << (100.0*unused_area/(width*height)) << "% free" << std::endl;
     return 0;
 }
