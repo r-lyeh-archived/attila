@@ -1,35 +1,41 @@
+#include <fstream>
 #include <iostream>
+#include <sstream>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "deps/spot/spot.hpp"
-// CImg.h code following
-#include "deps/spot/samples/cimg.h"
-#pragma comment(lib,"shell32.lib")
-#pragma comment(lib,"user32.lib")
-#pragma comment(lib,"gdi32.lib")
-void display( const spot::image &pic, const char *title = "" ) {
-    if( pic.size() ) {
-        cimg_library::CImg<unsigned char> ctexture( pic.w, pic.h, 1, 4, 0 );
-        for( size_t y = 0; y < pic.h; ++y ) {
-            for( size_t x = 0; x < pic.w; ++x ) {
-                spot::pixel pix = pic.at( x, y ).clamp().to_rgba();
-                ctexture( x, y, 0 ) = (unsigned char)(pix.r * 255.f);
-                ctexture( x, y, 1 ) = (unsigned char)(pix.g * 255.f);
-                ctexture( x, y, 2 ) = (unsigned char)(pix.b * 255.f);
-                ctexture( x, y, 3 ) = (unsigned char)(pix.a * 255.f);
-            }
-        }
-        ctexture.display( title );
-    }
-}
-
 #include "deps/packers/packer.hpp"
 #include "deps/packers/MaxRectsBinPack.h"
 
-#include <string>
-#include <vector>
-#include <sstream>
-#include <fstream>
-#include <utility>
+namespace options { 
+    bool ENABLE_CROPPING   = false;
+    bool ENABLE_POT        = false;
+    bool ENABLE_EDGE       = false;
+    bool ENABLE_BLEEDING   = false;
+};
+
+spot::image crop( const spot::image &src, unsigned *left = 0, unsigned *right = 0, unsigned *top = 0, unsigned *bottom = 0 ) {
+    unsigned width = src.w;
+    unsigned height = src.h;
+    unsigned x0 = ~0, y0 = ~0, x1 = 0, y1 = 0;
+    for( unsigned y = 0; y < height; y++ ) {
+        for( unsigned x = 0; x < width; x++ ) {
+            if( src.at(x,y).a != 0) {
+                if( x < x0 ) x0 = x;
+                if( x > x1 ) x1 = x;
+                if( y < y0 ) y0 = y;
+                if( y > y1 ) y1 = y;
+            }
+        }
+    }
+    if( left   ) *left = x0;
+    if( top    ) *top = y0;
+    if( right  ) *right = width - 1 - x1;
+    if( bottom ) *bottom = height - 1 - y1;
+    return src.copy(x0, y0, x1-x0, y1-y0);
+}
 
 std::string normalize( std::string filename ) {
     for( auto &ch : filename ) {
@@ -46,12 +52,16 @@ std::string normalize( std::string filename ) {
 
 struct texture {
     std::string src, dst;
-    std::vector<unsigned char> data;
 
     float w, h, x, y, u0, v0, u1, v1;
+    float left, right, top, bottom;
     unsigned rotate;
 
-    texture() : w(0), h(0), x(0), y(0), u0(0), v0(0), u1(1), v1(1), rotate(0)
+    texture() :
+    w(0), h(0), x(0), y(0), 
+    u0(0), v0(0), u1(1), v1(1),
+    left(0), right(0), top(0), bottom(0),
+    rotate(0)
     {}
 
     bool load( const std::string &pathfile ) {
@@ -62,10 +72,24 @@ struct texture {
         if( !img.size() )
             return false;
 
-        this->src = pathfile;
-        this->w = img.w;
-        this->h = img.h;
-        this->data = img.rgba_data();
+        src = pathfile;
+        w = img.w;
+        h = img.h;
+
+        if( options::ENABLE_CROPPING ) {
+            // padding enabled. crop input image: shrink to fit blank pixels
+            unsigned l, r, t, b;
+            spot::image cropped = crop( img, &l, &r, &t, &b );
+            if( !cropped.empty() ) {
+                left = l;
+                right = r;
+                top = t;
+                bottom = b;
+                img = cropped;
+                w = img.w;
+                h = img.h;
+            }            
+        }
 
         return true;
     }
@@ -76,17 +100,14 @@ struct texture {
         ss << tab << tab << "\"src\": \"" << normalize(src) << "\", \"dst\": \"" << normalize(dst) << "\"," << std::endl;
         ss << tab << tab << "\"x\": " << x << ", \"y\": " << y << ", \"w\": " << w << ", \"h\": " << h << "," << std::endl;
         ss << tab << tab << "\"u0\": " << u0 << ", \"v0\": " << v0 << ", \"u1\": " << u1 << ", \"v1\": " << v1 << "," << std::endl;
+        if( options::ENABLE_CROPPING ) {
+        ss << tab << tab << "\"crop-left\": " << left << ", \"crop-right\": " << right << ", \"crop-top\": " << top << ", \"crop-bottom\": " << bottom << "," << std::endl;            
+        }
         ss << tab << tab << "\"rotate\": " << rotate << ", \"hash\": " << std::hash<std::string>()(normalize(src)) << std::endl;
         ss << tab << "}";
         return ss.str();        
     }
 };
-
-void warn( std::ostream &out = std::cout, const std::string &a = std::string(), const std::string &b = std::string() ) {
-    if( a.size() ) out << a << ' ';
-    if( b.size() ) out << b << ' ';
-    out << std::endl;
-}
 
 std::vector<std::string> split( std::istream &is, char delim ) {
     std::string item;
@@ -99,60 +120,96 @@ std::vector<std::string> split( std::istream &is, char delim ) {
     return items;
 }
 
+int help( const char **argv ) {
+    std::cerr << std::string() + argv[0] + " v1.0.1 - lightweight atlas texture-packer - https://github.com/r-lyeh/attila\n\n";
+    std::cerr << std::string() + "Usage:\n";
+    std::cerr << std::string() + "\t" + argv[0] + " [options] output.img input.img [input2.img [...]]\n";
+    std::cerr << std::string() + "\t" + argv[0] + " [options] output.img @imagelist.txt [@imagelist2.txt [...]]\n\n";
+    std::cerr << std::string() + "Options:\n";
+    std::cerr << std::string() + "\t--help:              prints help\n";
+    std::cerr << std::string() + "\t--enable-bleeding:   enables output alpha bleeding (default: disabled)\n";
+    std::cerr << std::string() + "\t--enable-cropping:   enables input alpha cropping (default: disabled)\n";
+    std::cerr << std::string() + "\t--enable-edge:       enables output blank pixel separator (default: disabled)\n";
+    std::cerr << std::string() + "\t--enable-pot:        enables output power-of-two texture (default: disabled)\n\n";
+    std::cerr << "Notes:\n\tA JSON table of contents (toc) is written to stdout. Redirect it to a file if needed.\n\n";
+
+    std::string sep1 = "\tInput image formats: ";
+    for( auto &fmt : spot::list_supported_inputs() ) {
+        std::cerr << sep1 << fmt;
+        sep1 = ", ";
+    }
+    std::cerr << std::endl;
+
+    std::string sep2 = "\tOutput image formats: ";
+    for( auto &fmt : spot::list_supported_outputs() ) {
+        std::cerr << sep2 << fmt;
+        sep2 = ", ";
+    }
+    std::cerr << std::endl;
+
+    return -1;    
+}
+
 std::vector<std::string> list;
 std::vector<texture> textures;
 
-int main( int argc, const char **argv ) {
+int attila( int argc, const char **argv ) {
 
-    if( argc < 3 ) {
-        std::cerr << std::string() + argv[0] + " v1.0.0 - lightweight atlas texture/image packer - https://github.com/r-lyeh/attila\n\n";
-        std::cerr << std::string() + "Usage:\n\t" + argv[0] + " output.img input.img [input2.img [...]]\n\n";
-        std::cerr << "Notes:\n\tA JSON table of contents (toc) is written to stdout. Redirect it to a file if needed.\n\n";
-
-        std::string sep1 = "\tInput image formats: ";
-        for( auto &fmt : spot::list_supported_inputs() ) {
-            std::cerr << sep1 << fmt;
-            sep1 = ", ";
-        }
-        std::cerr << std::endl;
-
-        std::string sep2 = "\tOutput image formats: ";
-        for( auto &fmt : spot::list_supported_outputs() ) {
-            std::cerr << sep2 << fmt;
-            sep2 = ", ";
-        }
-        std::cerr << std::endl;
-
-        return -1;
-    }
-
-    std::string output = argv[1];
-
-    while( --argc > 1 ) {
+    while( --argc > 0 ) {
         list.push_back(argv[argc]);
     }
 
-    for( int i = 0; i < list.size(); ++i ) {
-        std::string filename = list[i];
+    for( unsigned i = 0; i < list.size(); ) {
+        const std::string &filename = list[i];
 
-        texture t;
-        if( filename[0] == '@' ) {
+        /**/ if( filename == "--enable-cropping") {
+            list.erase( list.begin() + i );
+            options::ENABLE_CROPPING = true;
+        }
+        else if( filename == "--enable-edge") {
+            list.erase( list.begin() + i );
+            options::ENABLE_EDGE = true;
+        }
+        else if( filename == "--enable-pot") {
+            list.erase( list.begin() + i );
+            options::ENABLE_POT = true;
+        }
+        else if( filename == "--enable-bleeding") {
+            list.erase( list.begin() + i );
+            options::ENABLE_BLEEDING = true;
+        }
+        else if( filename == "--help" ) {
+            return help( argv );
+        }
+        else if( filename[0] == '@' ) {
+            list.erase( list.begin() + i );
             std::ifstream ifs( filename.c_str() );
             if( ifs.is_open() ) {
                 std::vector<std::string> lines = split(ifs,'\n');
-                for( int i = 0; i < lines.size(); ++i ) {
+                for( unsigned i = 0; i < lines.size(); ++i ) {
                     list.push_back( lines[i] );
                 }
-                continue;
             }
         }
-        else
+        else {
+            ++i;            
+        }    
+    }
+
+    if( list.size() <= 1 ) {
+        return help( argv );
+    }
+
+    std::string output = list.back();
+    list.pop_back();
+
+    for( const auto &filename : list ) {
+        texture t;
         if( t.load(filename) ) {
             textures.push_back(t);
-            continue;
+        } else {
+            std::cerr << "[FAIL] Attila - cannot find: " << filename << std::endl;
         }
-
-        warn(std::cerr, "cannot find", filename);
     }
 
     if( textures.empty() ) {
@@ -171,13 +228,13 @@ int main( int argc, const char **argv ) {
 
     int width;
     int height;
-    bool is_power_of_two = true;
-    bool has_one_pixel_border = true;
-    int unused_area = tp->packTextures(width,height,is_power_of_two,has_one_pixel_border);
+    int unused_area = tp->packTextures(width,height,options::ENABLE_POT != 0,options::ENABLE_EDGE != 0);
 
     //mr.Init( width, height );
 
     spot::image mega( width, height );
+    //std::cerr << "[ OK ] Attila - Built " << width << 'x' << height << " texture...\n";
+
     std::string ss, sep = "";
 
     for( int i = 0; i < textures.size(); ++i ) {
@@ -195,7 +252,14 @@ int main( int argc, const char **argv ) {
         ss += sep + textures[i].json("\t");
         sep = ",\n";
         
-        spot::image img( t.src );
+        spot::image img;
+        if( !img.load(t.src) ) {
+            std::cerr << "[FAIL] Attila - cannot process: " << t.src << std::endl;            
+            return -1;
+        }
+        if( options::ENABLE_CROPPING ) {
+            img = crop(img);
+        }
         mega = mega.paste( x, y, t.rotate ? img.rotate_left() : img );
     }
 
@@ -208,6 +272,10 @@ int main( int argc, const char **argv ) {
         ext = normalize( ext );
         return file.size() < ext.size() ? false : file.substr( file.size() - ext.size() ) == ext;
     };
+
+    if( options::ENABLE_BLEEDING ) {
+        mega = mega.bleed();
+    }
 
     /**/ if( check_ext( output, ".bmp" ) ) {
         mega.save_as_bmp( output );
@@ -235,4 +303,17 @@ int main( int argc, const char **argv ) {
 
     std::cerr << "[ OK ] Attila - Texture (" << width << 'x' << height << ") area: " << (100.0*unused_area/(width*height)) << "% free" << std::endl;
     return 0;
+}
+
+int main( int argc, const char **argv ) {
+    try {
+        return attila( argc, argv );
+    }
+    catch( std::exception &e ) {
+        std::cerr << "[FAIL] Attila - " << e.what() << std::endl;
+    }
+    catch( ... ) {
+        std::cerr << "[FAIL] Attila - unknown exception" << std::endl;
+    }
+    return -1;
 }
