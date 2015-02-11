@@ -5,6 +5,12 @@
 #include <utility>
 #include <vector>
 
+#define VERSION "1.0.2" // upgraded to latest spot lib
+/*
+#define VERSION "1.0.1" // options, including image cropping and padding
+#define VERSION "1.0.0" // initial version
+*/
+
 #include "deps/spot/spot.hpp"
 #include "deps/packers/packer.hpp"
 #include "deps/packers/MaxRectsBinPack.h"
@@ -121,7 +127,7 @@ std::vector<std::string> split( std::istream &is, char delim ) {
 }
 
 int help( const char **argv ) {
-    std::cerr << std::string() + argv[0] + " v1.0.1 - lightweight atlas texture-packer - https://github.com/r-lyeh/attila\n\n";
+    std::cerr << std::string() + argv[0] + " v" VERSION " - lightweight atlas texture-packer - https://github.com/r-lyeh/attila\n\n";
     std::cerr << std::string() + "Usage:\n";
     std::cerr << std::string() + "\t" + argv[0] + " [options] output.img input.img [input2.img [...]]\n";
     std::cerr << std::string() + "\t" + argv[0] + " [options] output.img @imagelist.txt [@imagelist2.txt [...]]\n\n";
