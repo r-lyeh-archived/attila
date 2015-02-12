@@ -3,10 +3,11 @@
 #include <sstream>
 #include <string>
 #include <utility>
-#include <vector>
+#include <deque>
 
-#define VERSION "1.0.2" // upgraded to latest spot lib
+#define VERSION "1.0.3" // bugfixed error while handling @filelists
 /*
+#define VERSION "1.0.2" // upgraded to latest spot lib
 #define VERSION "1.0.1" // options, including image cropping and padding
 #define VERSION "1.0.0" // initial version
 */
@@ -115,16 +116,22 @@ struct texture {
     }
 };
 
-std::vector<std::string> split( std::istream &is, char delim ) {
-    std::string item;
-    std::vector<std::string> items;
-
-    while( std::getline( is, item, delim ) ) {
-        items.push_back(item);
+// taken from https://github.com/r-lyeh/wire
+std::deque<std::string> split( std::istream &is, const std::string &delimiters ) {
+    std::string map( 256, '\0' );
+    for( const unsigned char &ch : delimiters )
+        map[ ch ] = '\1';
+    std::deque<std::string> tokens(1);
+    std::stringstream ss;
+    ss << is.rdbuf();
+    for( const unsigned char &ch : ss.str() ) {
+        /**/ if( !map.at(ch)          ) tokens.back().push_back( char(ch) );
+        else if( tokens.back().size() ) tokens.push_back( std::string() );
     }
-
-    return items;
+    while( tokens.size() && !tokens.back().size() ) tokens.pop_back();
+    return tokens;
 }
+
 
 int help( const char **argv ) {
     std::cerr << std::string() + argv[0] + " v" VERSION " - lightweight atlas texture-packer - https://github.com/r-lyeh/attila\n\n";
@@ -156,8 +163,8 @@ int help( const char **argv ) {
     return -1;    
 }
 
-std::vector<std::string> list;
-std::vector<texture> textures;
+std::deque<std::string> list;
+std::deque<texture> textures;
 
 int attila( int argc, const char **argv ) {
 
@@ -166,7 +173,7 @@ int attila( int argc, const char **argv ) {
     }
 
     for( unsigned i = 0; i < list.size(); ) {
-        const std::string &filename = list[i];
+        const std::string filename = list[i];
 
         /**/ if( filename == "--enable-cropping") {
             list.erase( list.begin() + i );
@@ -188,13 +195,13 @@ int attila( int argc, const char **argv ) {
             return help( argv );
         }
         else if( filename[0] == '@' ) {
+            std::ifstream ifs( &filename[1] );
             list.erase( list.begin() + i );
-            std::ifstream ifs( filename.c_str() );
-            if( ifs.is_open() ) {
-                std::vector<std::string> lines = split(ifs,'\n');
+            if( ifs.good() ) {
+                std::deque<std::string> lines = split(ifs,"\t\f\v\r\n");
                 for( unsigned i = 0; i < lines.size(); ++i ) {
-                    list.push_back( lines[i] );
-                }
+                    list.push_front( lines[i] );
+                }                
             }
         }
         else {
@@ -214,7 +221,7 @@ int attila( int argc, const char **argv ) {
         if( t.load(filename) ) {
             textures.push_back(t);
         } else {
-            std::cerr << "[FAIL] Attila - cannot find: " << filename << std::endl;
+            std::cerr << "[FAIL] Attila - cannot load: " << filename << std::endl;
         }
     }
 
@@ -260,7 +267,7 @@ int attila( int argc, const char **argv ) {
         
         spot::image img;
         if( !img.load(t.src) ) {
-            std::cerr << "[FAIL] Attila - cannot process: " << t.src << std::endl;            
+            std::cerr << "[FAIL] Attila - cannot load: " << t.src << std::endl;            
             return -1;
         }
         if( options::ENABLE_CROPPING ) {
@@ -300,6 +307,9 @@ int attila( int argc, const char **argv ) {
     }
     else if( check_ext( output, ".webp" ) ) {
         mega.save_as_webp( output, 70 );
+    }
+    else if( check_ext( output, ".pug" ) ) {
+        mega.save_as_pug( output, 70 );
     }
     else {
         mega.save_as_png( output );
