@@ -5,8 +5,9 @@
 #include <utility>
 #include <deque>
 
-#define VERSION "1.0.3" // bugfixed error while handling @filelists
+#define VERSION "1.0.4" // enable mipmap generation
 /*
+#define VERSION "1.0.3" // bugfixed error while handling @filelists
 #define VERSION "1.0.2" // upgraded to latest spot lib
 #define VERSION "1.0.1" // options, including image cropping and padding
 #define VERSION "1.0.0" // initial version
@@ -21,6 +22,7 @@ namespace options {
     bool ENABLE_POT        = false;
     bool ENABLE_EDGE       = false;
     bool ENABLE_BLEEDING   = false;
+    bool ENABLE_MIPMAPS    = false;
 };
 
 spot::image crop( const spot::image &src, unsigned *left = 0, unsigned *right = 0, unsigned *top = 0, unsigned *bottom = 0 ) {
@@ -42,6 +44,32 @@ spot::image crop( const spot::image &src, unsigned *left = 0, unsigned *right = 
     if( right  ) *right = width - 1 - x1;
     if( bottom ) *bottom = height - 1 - y1;
     return src.copy(x0, y0, x1-x0, y1-y0);
+}
+
+spot::image &halve( spot::image &img, unsigned factor = 2 ) {
+    if( factor >= 2 ) {
+        for( unsigned y = 0, h = img.h / factor; y < h; ++y ) {
+            for( unsigned x = 0, w = img.w / factor; x < w; ++x ) {
+                img[x + y * w] = img[x * factor + y * factor * img.w];
+            }
+        }
+        img.w /= factor;
+        img.h /= factor;
+        img.resize( img.w * img.h );
+    }
+    return img;
+}
+
+spot::image build_mipmaps( spot::image img, unsigned maxlevels = 0 ) {
+    auto edge = img.w, bottom = img.h, left = edge - edge, top = bottom - bottom;
+    spot::image cpy( edge + edge / 2, bottom );
+    cpy = cpy.paste( left, top, img );
+    do {
+        img = halve( img );
+        cpy = cpy.paste( edge, top, img );
+        top += img.h;
+    } while( img.w > 1 && img.h > 1 );
+    return cpy;
 }
 
 std::string normalize( std::string filename ) {
@@ -143,7 +171,8 @@ int help( const char **argv ) {
     std::cerr << std::string() + "\t--enable-bleeding:   enables output alpha bleeding (default: disabled)\n";
     std::cerr << std::string() + "\t--enable-cropping:   enables input alpha cropping (default: disabled)\n";
     std::cerr << std::string() + "\t--enable-edge:       enables output blank pixel separator (default: disabled)\n";
-    std::cerr << std::string() + "\t--enable-pot:        enables output power-of-two texture (default: disabled)\n\n";
+    std::cerr << std::string() + "\t--enable-pot:        enables output power-of-two texture (default: disabled)\n";
+    std::cerr << std::string() + "\t--enable-mipmaps:    enables mipmaps (default: disabled)\n\n";
     std::cerr << "Notes:\n\tA JSON table of contents (toc) is written to stdout. Redirect it to a file if needed.\n\n";
 
     std::string sep1 = "\tInput image formats: ";
@@ -190,6 +219,10 @@ int attila( int argc, const char **argv ) {
         else if( filename == "--enable-bleeding") {
             list.erase( list.begin() + i );
             options::ENABLE_BLEEDING = true;
+        }
+        else if( filename == "--enable-mipmaps") {
+            list.erase( list.begin() + i );
+            options::ENABLE_MIPMAPS = true;
         }
         else if( filename == "--help" ) {
             return help( argv );
@@ -285,6 +318,10 @@ int attila( int argc, const char **argv ) {
         ext = normalize( ext );
         return file.size() < ext.size() ? false : file.substr( file.size() - ext.size() ) == ext;
     };
+
+    if( options::ENABLE_MIPMAPS ) {
+        mega = build_mipmaps( mega );
+    }
 
     if( options::ENABLE_BLEEDING ) {
         mega = mega.bleed();

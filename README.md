@@ -40,7 +40,8 @@ attila.exe [options] output.img @imagelist.txt [@imagelist2.txt [...]] > atlas.j
 --enable-cropping:   enables input alpha cropping (default: disabled)
 --enable-edge:       enables output blank pixel separator (default: disabled)
 --enable-pot:        enables output power-of-two texture (default: disabled)
-```
+--enable-mipmaps:    enables mipmaps (default: disabled)
+ ```
 
 ## Showcase
 ```c++
@@ -136,6 +137,13 @@ REM others
 $CC -c deps/spot/spotc.c -I deps/spot -O2 -DNDEBUG
 $CXX -o attila -std=c++11 attila.cc deps/spot/spot.cpp spotc.o -I deps/spot deps/packers/*.cpp -lrt -O2 -DNDEBUG
 ```
+
+## Changelog
+- v1.0.4: enable mipmap generation
+- v1.0.3: bugfixed error while handling @filelists
+- v1.0.2: upgraded to latest spot lib
+- v1.0.1: options, including image cropping and padding
+- v1.0.0: initial version
 
 ## Licenses
 - [Attila](https://github.com/r-lyeh/attila), BOOST licensed.
