@@ -2,9 +2,9 @@ attila <a href="https://travis-ci.org/r-lyeh/attila"><img src="https://api.travi
 ======
 
 - Attila is a tiny atlas texture-packer.
-- Attila features a wide image/texture file support (see table below). 
+- Attila features a wide image/texture file support (see table below).
 - Attila generates table of contents in JSON format.
-- Attila is BOOST licensed.
+- Attila is zlib/libpng licensed.
 
 ## File format support
 
@@ -146,5 +146,5 @@ $CXX -o attila -std=c++11 attila.cc deps/spot/spot.cpp spotc.o -I deps/spot deps
 - v1.0.0: initial version
 
 ## Licenses
-- [Attila](https://github.com/r-lyeh/attila), BOOST licensed.
+- [Attila](https://github.com/r-lyeh/attila), zlib/libpng licensed.
 - [Texture Packer](https://github.com/r-lyeh/attila/blob/master/deps/packers/packer.hpp) by John W. Ratcliff, MIT licensed.
