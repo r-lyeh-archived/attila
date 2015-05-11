@@ -8,24 +8,31 @@ attila <a href="https://travis-ci.org/r-lyeh/attila"><img src="https://api.travi
 
 ## File format support
 
-| File format  | Input | Output |
+| File format  | Read | Write |
 | :-------------|:-------------:| :-----:|
 | BMP files | yes | yes |
+| CRN files | yes | no |
 | DDS DXT1/2/3/4/5 files | yes | yes |
 | GIF files | yes | no |
 | HDR files | yes | no |
 | JPG files (progressive) | yes | no |
 | JPG files | yes | yes |
+| KTX (ETC1) files | yes* | yes* |
+| KTX (PVRTC) files | yes* | no |
 | PIC files | yes | no |
-| PKM (ETC1) files | yes | no |
+| PKM (ETC1) files | yes | yes |
 | PNG files | yes | yes |
 | PNM (PPM/PGM) files | yes | no |
 | PSD files | yes | no |
 | PUG files | yes | yes |
-| PVR (PVRTC) files | yes | no |
+| PVR2 (PVRTC) files | yes* | no |
+| PVR3 (ETC1) files | yes* | no |
+| PVR3 (PVRTC) files | yes* | yes* |
 | SVG files (rasterized) | yes | no |
 | TGA files | yes | yes |
-| WebP files | yes | yes |
+| WEBP files | yes | yes |
+
+(*) partial support
 
 ## Usage
 ```c++
@@ -139,11 +146,12 @@ $CXX -o attila -std=c++11 attila.cc deps/spot/spot.cpp spotc.o -I deps/spot deps
 ```
 
 ## Changelog
-- v1.0.4: enable mipmap generation
-- v1.0.3: bugfixed error while handling @filelists
-- v1.0.2: upgraded to latest spot lib
-- v1.0.1: options, including image cropping and padding
-- v1.0.0: initial version
+- v1.0.5 (2015/05/11): pump up libspot
+- v1.0.4 (2015/04/09): enable mipmap generation
+- v1.0.3 (2015/02/12): bugfixed error while handling @filelists
+- v1.0.2 (2015/02/11): upgraded to latest spot lib
+- v1.0.1 (2015/02/09): options, including image cropping and padding
+- v1.0.0 (2015/02/06): initial version
 
 ## Licenses
 - [Attila](https://github.com/r-lyeh/attila), zlib/libpng licensed.

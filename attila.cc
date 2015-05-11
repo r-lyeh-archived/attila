@@ -5,12 +5,13 @@
 #include <utility>
 #include <deque>
 
-#define VERSION "1.0.4" // enable mipmap generation
+#define ATTILA_VERSION "1.0.5" // pump up libspot
 /*
-#define VERSION "1.0.3" // bugfixed error while handling @filelists
-#define VERSION "1.0.2" // upgraded to latest spot lib
-#define VERSION "1.0.1" // options, including image cropping and padding
-#define VERSION "1.0.0" // initial version
+#define ATTILA_VERSION "1.0.4" // enable mipmap generation
+#define ATTILA_VERSION "1.0.3" // bugfixed error while handling @filelists
+#define ATTILA_VERSION "1.0.2" // upgraded to latest spot lib
+#define ATTILA_VERSION "1.0.1" // options, including image cropping and padding
+#define ATTILA_VERSION "1.0.0" // initial version
 */
 
 #include "deps/spot/spot.hpp"
@@ -162,7 +163,7 @@ std::deque<std::string> split( std::istream &is, const std::string &delimiters )
 
 
 int help( const char **argv ) {
-    std::cerr << std::string() + argv[0] + " v" VERSION " - lightweight atlas texture-packer - https://github.com/r-lyeh/attila\n\n";
+    std::cerr << std::string() + argv[0] + " v" ATTILA_VERSION " (libspot v" SPOT_VERSION ") - lightweight atlas texture-packer - https://github.com/r-lyeh/attila\n\n";
     std::cerr << std::string() + "Usage:\n";
     std::cerr << std::string() + "\t" + argv[0] + " [options] output.img input.img [input2.img [...]]\n";
     std::cerr << std::string() + "\t" + argv[0] + " [options] output.img @imagelist.txt [@imagelist2.txt [...]]\n\n";
