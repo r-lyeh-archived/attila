@@ -42,13 +42,14 @@ attila.exe [options] output.img @imagelist.txt [@imagelist2.txt [...]] > atlas.j
 
 ## Options
 ```c++
---help:              prints help
---enable-bleeding:   enables output alpha bleeding (default: disabled)
---enable-cropping:   enables input alpha cropping (default: disabled)
---enable-edge:       enables output blank pixel separator (default: disabled)
---enable-pot:        enables output power-of-two texture (default: disabled)
---enable-mipmaps:    enables mipmaps (default: disabled)
- ```
+--help                 prints help
+--enable-bleeding      enables output alpha bleeding (default: disabled)
+--enable-cropping      enables input alpha cropping (default: disabled)
+--enable-edge          enables output blank pixel separator (default: disabled)
+--enable-pot           enables output power-of-two texture (default: disabled)
+--enable-mipmaps       enables mipmaps (default: disabled)
+--enable-width WIDTH   enables minimum fixed width (in pixels) (default: 0)
+```
 
 ## Showcase
 ```c++
@@ -146,6 +147,7 @@ $CXX -o attila -std=c++11 attila.cc deps/spot/spot.cpp spotc.o -I deps/spot deps
 ```
 
 ## Changelog
+- v1.0.6 (2015/07/30): minimum width option
 - v1.0.5 (2015/05/11): pump up libspot
 - v1.0.4 (2015/04/09): enable mipmap generation
 - v1.0.3 (2015/02/12): bugfixed error while handling @filelists

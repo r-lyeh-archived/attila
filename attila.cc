@@ -5,25 +5,25 @@
 #include <utility>
 #include <deque>
 
+#define ATTILA_VERSION "1.0.6" /* minimum width option
 #define ATTILA_VERSION "1.0.5" // pump up libspot
-/*
 #define ATTILA_VERSION "1.0.4" // enable mipmap generation
 #define ATTILA_VERSION "1.0.3" // bugfixed error while handling @filelists
 #define ATTILA_VERSION "1.0.2" // upgraded to latest spot lib
 #define ATTILA_VERSION "1.0.1" // options, including image cropping and padding
-#define ATTILA_VERSION "1.0.0" // initial version
-*/
+#define ATTILA_VERSION "1.0.0" // initial version */
 
 #include "deps/spot/spot.hpp"
 #include "deps/packers/packer.hpp"
 #include "deps/packers/MaxRectsBinPack.h"
 
 namespace options { 
-    bool ENABLE_CROPPING   = false;
-    bool ENABLE_POT        = false;
-    bool ENABLE_EDGE       = false;
-    bool ENABLE_BLEEDING   = false;
-    bool ENABLE_MIPMAPS    = false;
+    bool        ENABLE_CROPPING      = false;
+    bool        ENABLE_POT           = false;
+    bool        ENABLE_EDGE          = false;
+    bool        ENABLE_BLEEDING      = false;
+    bool        ENABLE_MIPMAPS       = false;
+    unsigned    ENABLE_MINIMUM_WIDTH = 0;
 };
 
 spot::image crop( const spot::image &src, unsigned *left = 0, unsigned *right = 0, unsigned *top = 0, unsigned *bottom = 0 ) {
@@ -92,6 +92,7 @@ struct texture {
     float w, h, x, y, u0, v0, u1, v1;
     float left, right, top, bottom;
     unsigned rotate;
+    spot::image img;
 
     texture() :
     w(0), h(0), x(0), y(0), 
@@ -104,8 +105,8 @@ struct texture {
         //reset
         *this = texture();
 
-        spot::image img( pathfile );
-        if( !img.size() )
+		img.load(pathfile);
+        if( img.empty() )
             return false;
 
         src = pathfile;
@@ -124,7 +125,7 @@ struct texture {
                 img = cropped;
                 w = img.w;
                 h = img.h;
-            }            
+            }
         }
 
         return true;
@@ -168,12 +169,13 @@ int help( const char **argv ) {
     std::cerr << std::string() + "\t" + argv[0] + " [options] output.img input.img [input2.img [...]]\n";
     std::cerr << std::string() + "\t" + argv[0] + " [options] output.img @imagelist.txt [@imagelist2.txt [...]]\n\n";
     std::cerr << std::string() + "Options:\n";
-    std::cerr << std::string() + "\t--help:              prints help\n";
-    std::cerr << std::string() + "\t--enable-bleeding:   enables output alpha bleeding (default: disabled)\n";
-    std::cerr << std::string() + "\t--enable-cropping:   enables input alpha cropping (default: disabled)\n";
-    std::cerr << std::string() + "\t--enable-edge:       enables output blank pixel separator (default: disabled)\n";
-    std::cerr << std::string() + "\t--enable-pot:        enables output power-of-two texture (default: disabled)\n";
-    std::cerr << std::string() + "\t--enable-mipmaps:    enables mipmaps (default: disabled)\n\n";
+    std::cerr << std::string() + "\t--help                 prints help\n";
+    std::cerr << std::string() + "\t--enable-bleeding      enables output alpha bleeding (default: disabled)\n";
+    std::cerr << std::string() + "\t--enable-cropping      enables input alpha cropping (default: disabled)\n";
+    std::cerr << std::string() + "\t--enable-edge          enables output blank pixel separator (default: disabled)\n";
+    std::cerr << std::string() + "\t--enable-pot           enables output power-of-two texture (default: disabled)\n";
+    std::cerr << std::string() + "\t--enable-mipmaps       enables mipmaps (default: disabled)\n";
+    std::cerr << std::string() + "\t--enable-width WIDTH   enables minimum fixed width (in pixels) (default: 0)\n\n";
     std::cerr << "Notes:\n\tA JSON table of contents (toc) is written to stdout. Redirect it to a file if needed.\n\n";
 
     std::string sep1 = "\tInput image formats: ";
@@ -225,6 +227,13 @@ int attila( int argc, const char **argv ) {
             list.erase( list.begin() + i );
             options::ENABLE_MIPMAPS = true;
         }
+        else if( filename == "--enable-width") {
+            list.erase( list.begin() + i );
+            if( i-1 >= 0 && i-1 < list.size() ) {
+                options::ENABLE_MINIMUM_WIDTH = std::strtoul( (list.begin() + --i)->c_str(), 0, 0 );
+                list.erase( list.begin() + i );
+            }
+        }
         else if( filename == "--help" ) {
             return help( argv );
         }
@@ -235,11 +244,11 @@ int attila( int argc, const char **argv ) {
                 std::deque<std::string> lines = split(ifs,"\t\f\v\r\n");
                 for( unsigned i = 0; i < lines.size(); ++i ) {
                     list.push_front( lines[i] );
-                }                
+                }
             }
         }
         else {
-            ++i;            
+            ++i;
         }    
     }
 
@@ -263,9 +272,17 @@ int attila( int argc, const char **argv ) {
         return -1;
     }
 
+    std::sort( textures.begin(), textures.end(), []( texture &a, texture &b ) { return a.src < b.src; } );
+
     //using namespace rbp;
     //MaxRectsBinPack mr;
     //std::vector<Rect> rects;
+
+    if( options::ENABLE_MINIMUM_WIDTH ) {
+        textures.push_back( texture() );
+        textures.back().w = options::ENABLE_MINIMUM_WIDTH;
+        textures.back().h = 1;
+    }
 
     TEXTURE_PACKER::TexturePacker *tp = TEXTURE_PACKER::createTexturePacker();
     tp->setTextureCount(textures.size());
@@ -273,9 +290,17 @@ int attila( int argc, const char **argv ) {
         tp->addTexture(textures[i].w, textures[i].h);
     }
 
+    if( options::ENABLE_MINIMUM_WIDTH ) {
+        textures.pop_back();
+    }
+
     int width;
     int height;
     int unused_area = tp->packTextures(width,height,options::ENABLE_POT != 0,options::ENABLE_EDGE != 0);
+
+    if( options::ENABLE_MINIMUM_WIDTH ) {
+        width -= options::ENABLE_MINIMUM_WIDTH;
+    }
 
     //mr.Init( width, height );
 
@@ -298,7 +323,8 @@ int attila( int argc, const char **argv ) {
         
         ss += sep + textures[i].json("\t");
         sep = ",\n";
-        
+
+#if 0
         spot::image img;
         if( !img.load(t.src) ) {
             std::cerr << "[FAIL] Attila - cannot load: " << t.src << std::endl;            
@@ -307,6 +333,9 @@ int attila( int argc, const char **argv ) {
         if( options::ENABLE_CROPPING ) {
             img = crop(img);
         }
+#else
+        spot::image &img = t.img;
+#endif
         mega = mega.paste( x, y, t.rotate ? img.rotate_left() : img );
     }
 
