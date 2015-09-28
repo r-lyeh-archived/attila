@@ -5,7 +5,8 @@
 #include <utility>
 #include <deque>
 
-#define ATTILA_VERSION "1.0.6" /* minimum width option
+#define ATTILA_VERSION "1.0.7" /* optimized image pasting
+#define ATTILA_VERSION "1.0.6" // minimum width option
 #define ATTILA_VERSION "1.0.5" // pump up libspot
 #define ATTILA_VERSION "1.0.4" // enable mipmap generation
 #define ATTILA_VERSION "1.0.3" // bugfixed error while handling @filelists
@@ -105,7 +106,7 @@ struct texture {
         //reset
         *this = texture();
 
-		img.load(pathfile);
+        img.load(pathfile);
         if( img.empty() )
             return false;
 
@@ -260,11 +261,10 @@ int attila( int argc, const char **argv ) {
     list.pop_back();
 
     for( const auto &filename : list ) {
-        texture t;
-        if( t.load(filename) ) {
-            textures.push_back(t);
-        } else {
+        textures.push_back( texture() );
+        if( !textures.back().load(filename) ) {
             std::cerr << "[FAIL] Attila - cannot load: " << filename << std::endl;
+            textures.pop_back();
         }
     }
 
@@ -336,7 +336,7 @@ int attila( int argc, const char **argv ) {
 #else
         spot::image &img = t.img;
 #endif
-        mega = mega.paste( x, y, t.rotate ? img.rotate_left() : img );
+        mega.paste( mega, x, y, t.rotate ? img.rotate_left() : img );
     }
 
     std::cout << "{\n" << ss << "\n}\n" << std::endl; 

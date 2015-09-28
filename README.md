@@ -1,4 +1,4 @@
-attila <a href="https://travis-ci.org/r-lyeh/attila"><img src="https://api.travis-ci.org/r-lyeh/attila.svg?branch=master" align="right" /></a>
+attila :fire: <a href="https://travis-ci.org/r-lyeh/attila"><img src="https://api.travis-ci.org/r-lyeh/attila.svg?branch=master" align="right" /></a>
 ======
 
 - Attila is a tiny atlas texture-packer.
@@ -147,6 +147,7 @@ $CXX -o attila -std=c++11 attila.cc deps/spot/spot.cpp spotc.o -I deps/spot deps
 ```
 
 ## Changelog
+- v1.0.7 (2015/09/28): faster image pasting
 - v1.0.6 (2015/07/30): minimum width option
 - v1.0.5 (2015/05/11): pump up libspot
 - v1.0.4 (2015/04/09): enable mipmap generation
