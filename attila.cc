@@ -5,14 +5,16 @@
 #include <utility>
 #include <deque>
 
-#define ATTILA_VERSION "1.0.7" /* optimized image pasting
-#define ATTILA_VERSION "1.0.6" // minimum width option
-#define ATTILA_VERSION "1.0.5" // pump up libspot
-#define ATTILA_VERSION "1.0.4" // enable mipmap generation
-#define ATTILA_VERSION "1.0.3" // bugfixed error while handling @filelists
-#define ATTILA_VERSION "1.0.2" // upgraded to latest spot lib
-#define ATTILA_VERSION "1.0.1" // options, including image cropping and padding
-#define ATTILA_VERSION "1.0.0" // initial version */
+#define ATTILA_VERSION "1.0.8" /* (2016/02/08): pump up libspot
+#define ATTILA_VERSION "1.0.7" // (2015/09/28): faster image pasting
+#define ATTILA_VERSION "1.0.6" // (2015/07/30): minimum width option
+#define ATTILA_VERSION "1.0.5" // (2015/05/11): pump up libspot
+#define ATTILA_VERSION "1.0.4" // (2015/04/09): enable mipmap generation
+#define ATTILA_VERSION "1.0.3" // (2015/02/12): bugfixed error while handling @filelists
+#define ATTILA_VERSION "1.0.2" // (2015/02/11): upgraded to latest spot lib
+#define ATTILA_VERSION "1.0.1" // (2015/02/09): options, including image cropping and padding
+#define ATTILA_VERSION "1.0.0" // (2015/02/06): initial version */
+
 
 #include "deps/spot/spot.hpp"
 #include "deps/packers/packer.hpp"

@@ -13,6 +13,8 @@ attila :fire: <a href="https://travis-ci.org/r-lyeh/attila"><img src="https://ap
 | BMP files | yes | yes |
 | CRN files | yes | no |
 | DDS DXT1/2/3/4/5 files | yes | yes |
+| EXR files | yes | no |
+| FLIF files | yes | no |
 | GIF files | yes | no |
 | HDR files | yes | no |
 | JPG files (progressive) | yes | no |
@@ -147,6 +149,7 @@ $CXX -o attila -std=c++11 attila.cc deps/spot/spot.cpp spotc.o -I deps/spot deps
 ```
 
 ## Changelog
+- v1.0.8 (2016/02/08): pump up libspot
 - v1.0.7 (2015/09/28): faster image pasting
 - v1.0.6 (2015/07/30): minimum width option
 - v1.0.5 (2015/05/11): pump up libspot
