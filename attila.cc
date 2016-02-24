@@ -5,7 +5,8 @@
 #include <utility>
 #include <deque>
 
-#define ATTILA_VERSION "1.0.8" /* (2016/02/08): pump up libspot
+#define ATTILA_VERSION "1.0.9" /* (2016/02/24): fix extra unused area bug; fix minimum width bug
+#define ATTILA_VERSION "1.0.8" // (2016/02/08): pump up libspot
 #define ATTILA_VERSION "1.0.7" // (2015/09/28): faster image pasting
 #define ATTILA_VERSION "1.0.6" // (2015/07/30): minimum width option
 #define ATTILA_VERSION "1.0.5" // (2015/05/11): pump up libspot
@@ -15,10 +16,22 @@
 #define ATTILA_VERSION "1.0.1" // (2015/02/09): options, including image cropping and padding
 #define ATTILA_VERSION "1.0.0" // (2015/02/06): initial version */
 
-
 #include "deps/spot/spot.hpp"
-#include "deps/packers/packer.hpp"
+#include "deps/packers/TexturePacker.h"
 #include "deps/packers/MaxRectsBinPack.h"
+
+#ifdef ATTILA_USE_OPENMP
+#	include <omp.h>
+	static float now() {
+	    return float( omp_get_wtime() );
+	}
+#else
+#	include <chrono>
+	static float now() {
+	    static auto epoch = std::chrono::steady_clock::now();
+        return float( std::chrono::duration_cast< std::chrono::milliseconds >( std::chrono::steady_clock::now() - epoch ).count() / 1000.0 );
+    }
+#endif
 
 namespace options { 
     bool        ENABLE_CROPPING      = false;
@@ -202,6 +215,7 @@ std::deque<std::string> list;
 std::deque<texture> textures;
 
 int attila( int argc, const char **argv ) {
+    auto start = now();
 
     while( --argc > 0 ) {
         list.push_back(argv[argc]);
@@ -300,9 +314,10 @@ int attila( int argc, const char **argv ) {
     int height;
     int unused_area = tp->packTextures(width,height,options::ENABLE_POT != 0,options::ENABLE_EDGE != 0);
 
-    if( options::ENABLE_MINIMUM_WIDTH ) {
+    /* if( options::ENABLE_MINIMUM_WIDTH ) {
+        if (width > options::ENABLE_MINIMUM_WIDTH)
         width -= options::ENABLE_MINIMUM_WIDTH;
-    }
+    } */
 
     //mr.Init( width, height );
 
@@ -386,19 +401,24 @@ int attila( int argc, const char **argv ) {
 
     TEXTURE_PACKER::releaseTexturePacker( tp );
 
-    std::cerr << "[ OK ] Attila - Texture (" << width << 'x' << height << ") area: " << (100.0*unused_area/(width*height)) << "% free" << std::endl;
+    auto end = now();
+
+    std::cerr << "[ OK ] Attila - Texture (" << width << 'x' << height << ") area: " << (100.0*unused_area/(width*height)) << "% free in " << (end - start) << " secs." << std::endl;
     return 0;
 }
 
-int main( int argc, const char **argv ) {
-    try {
-        return attila( argc, argv );
-    }
-    catch( std::exception &e ) {
-        std::cerr << "[FAIL] Attila - " << e.what() << std::endl;
-    }
-    catch( ... ) {
-        std::cerr << "[FAIL] Attila - unknown exception" << std::endl;
-    }
-    return -1;
+int main( int argc, const char **argv ) try {
+    return attila( argc, argv );
 }
+catch( std::exception &e ) {
+    std::cerr << "[FAIL] Attila - " << e.what() << std::endl;
+}
+catch( const char *error ) {
+    std::cerr << "[FAIL] Attila - " << error << std::endl;
+}
+catch( ... ) {
+    std::cerr << "[FAIL] Attila - unknown exception" << std::endl;
+}
+
+
+#include "deps/packers/TexturePacker.cpp"

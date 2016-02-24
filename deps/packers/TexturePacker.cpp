@@ -1,6 +1,15 @@
-#include <cassert>
+#include "TexturePacker.h"
 #include <math.h>
-#include "packer.hpp"
+
+#ifdef assert
+#undef assert
+#endif
+
+#ifdef ATTILA_USE_ASSERT
+#include <assert.h>
+#else
+#define assert(...) if( !(__VA_ARGS__) ) throw __FILE__ " " #__VA_ARGS__
+#endif
 
 #pragma warning(disable:4100 4244)
 
@@ -164,8 +173,8 @@ public:
     r2.mX2++;
     r2.mY2++;
 
-
-    /**/ if ( r1.mX1 == r2.mX1 && r1.mX2 == r2.mX2 && r1.mY1 == r2.mY2 ) // if we share the top edge
+    // if we share the top edge then..
+    if ( r1.mX1 == r2.mX1 && r1.mX2 == r2.mX2 && r1.mY1 == r2.mY2 )
     {
       mY = n.mY;
       mHeight+=n.mHeight;
@@ -176,13 +185,13 @@ public:
       mHeight+=n.mHeight;
       ret = true;
     }
-    else if ( r1.mY1 == r2.mY1 && r1.mY2 == r2.mY2 && r1.mX1 == r2.mX2 ) // if we share the left edge
+    else if ( r1.mY1 == r2.mY1 && r1.mY2 == r2.mY1 && r1.mX1 == r2.mX2 ) // if we share the left edge
     {
       mX = n.mX;
       mWidth+=n.mWidth;
       ret = true;
     }
-    else if ( r1.mY1 == r2.mY1 && r1.mY2 == r2.mY2 && r1.mX2 == r2.mX1 ) // if we share the right edge
+    else if ( r1.mY1 == r2.mY1 && r1.mY2 == r2.mY1 && r1.mX2 == r2.mX1 ) // if we share the left edge
     {
       mWidth+=n.mWidth;
       ret = true;
@@ -234,7 +243,6 @@ public:
         delete kill;
       }
     }
-    mFreeList = 0;
   }
 
   virtual void  setTextureCount(int tcount) // number of textures to consider..
@@ -295,7 +303,7 @@ public:
       mLongestEdge = nextPow2(mLongestEdge);
     }
 
-    width  = 2*mLongestEdge;              // The width is no more than the longest edge of any rectangle passed in
+    width  = mLongestEdge;              // The width is no more than the longest edge of any rectangle passed in
     int count = mTotalArea / (mLongestEdge*mLongestEdge);
     height = (count+2)*mLongestEdge;            // We guess that the height is no more than twice the longest edge.  On exit, this will get shrunk down to the actual tallest height.
 
@@ -356,8 +364,7 @@ public:
       while ( search )
       {
         int ec;
-				int ok = search->fits(t.mWidth, t.mHeight, ec);
-        if ( ok ) // see if the texture will fit into this slot, and if so how many edges does it share.
+        if ( search->fits(t.mWidth,t.mHeight,ec) ) // see if the texture will fit into this slot, and if so how many edges does it share.
         {
           if ( ec == 2 )
           {
@@ -518,7 +525,7 @@ public:
       else
       {
         y = t.mY + t.mHeight;
-      }
+      }   
 
       if ( y > height )
         height = y;

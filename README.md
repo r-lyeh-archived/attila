@@ -141,14 +141,15 @@ C:\attila>start atlas.png
 ## Build and redistribution
 ```bash
 REM windows
-cl attila.cc deps\spot\spot*.c* deps\packers\*.cpp /EHsc /Ox /Oy /MT /DNDEBUG /link setargv.obj
+cl attila.cc deps\spot\spot*.c* /EHsc /Ox /Oy /MT /DNDEBUG /link setargv.obj
 
 REM others
 $CC -c deps/spot/spotc.c -I deps/spot -O2 -DNDEBUG
-$CXX -o attila -std=c++11 attila.cc deps/spot/spot.cpp spotc.o -I deps/spot deps/packers/*.cpp -lrt -O2 -DNDEBUG
+$CXX -o attila -std=c++11 attila.cc deps/spot/spot.cpp spotc.o -I deps/spot -lrt -O2 -DNDEBUG
 ```
 
 ## Changelog
+- v1.0.9 (2016/02/24): fix extra unused area bug; fix minimum width bug
 - v1.0.8 (2016/02/08): pump up libspot
 - v1.0.7 (2015/09/28): faster image pasting
 - v1.0.6 (2015/07/30): minimum width option

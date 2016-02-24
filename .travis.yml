@@ -12,4 +12,4 @@ install:
 
 script:
   - $CC -c deps/spot/spotc.c -I deps/spot -O2 -DNDEBUG
-  - $CXX -o attila -std=c++11 attila.cc deps/spot/spot.cpp spotc.o -I deps/spot deps/packers/*.cpp -lrt -O2 -DNDEBUG
+  - $CXX -o attila -std=c++11 attila.cc deps/spot/spot.cpp spotc.o -I deps/spot -lrt -O2 -DNDEBUG
