@@ -149,6 +149,7 @@ $CXX -o attila -std=c++11 attila.cc deps/spot/spot.cpp spotc.o -I deps/spot -lrt
 ```
 
 ## Changelog
+- v1.1.0 (2018/11/17): fix uv0/uv1 coords; add c mode; update libspot
 - v1.0.9 (2016/02/24): fix extra unused area bug; fix minimum width bug
 - v1.0.8 (2016/02/08): pump up libspot
 - v1.0.7 (2015/09/28): faster image pasting

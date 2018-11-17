@@ -5,7 +5,8 @@
 #include <utility>
 #include <deque>
 
-#define ATTILA_VERSION "1.0.9" /* (2016/02/24): fix extra unused area bug; fix minimum width bug
+#define ATTILA_VERSION "1.1.0" /* (2018/11/17): fix uv0/uv1 coords; add c mode; update libspot
+#define ATTILA_VERSION "1.0.9" // (2016/02/24): fix extra unused area bug; fix minimum width bug
 #define ATTILA_VERSION "1.0.8" // (2016/02/08): pump up libspot
 #define ATTILA_VERSION "1.0.7" // (2015/09/28): faster image pasting
 #define ATTILA_VERSION "1.0.6" // (2015/07/30): minimum width option
@@ -21,14 +22,14 @@
 #include "deps/packers/MaxRectsBinPack.h"
 
 #ifdef ATTILA_USE_OPENMP
-#	include <omp.h>
-	static float now() {
-	    return float( omp_get_wtime() );
-	}
+#   include <omp.h>
+    static float now() {
+        return float( omp_get_wtime() );
+    }
 #else
-#	include <chrono>
-	static float now() {
-	    static auto epoch = std::chrono::steady_clock::now();
+#   include <chrono>
+    static float now() {
+        static auto epoch = std::chrono::steady_clock::now();
         return float( std::chrono::duration_cast< std::chrono::milliseconds >( std::chrono::steady_clock::now() - epoch ).count() / 1000.0 );
     }
 #endif
@@ -39,6 +40,7 @@ namespace options {
     bool        ENABLE_EDGE          = false;
     bool        ENABLE_BLEEDING      = false;
     bool        ENABLE_MIPMAPS       = false;
+    bool        ENABLE_C_OUTPUT      = false;
     unsigned    ENABLE_MINIMUM_WIDTH = 0;
 };
 
@@ -158,7 +160,21 @@ struct texture {
         }
         ss << tab << tab << "\"rotate\": " << rotate << ", \"hash\": " << std::hash<std::string>()(normalize(src)) << std::endl;
         ss << tab << "}";
-        return ss.str();        
+        return ss.str();
+    }
+
+    std::string c( const std::string &tab = std::string() ) const {
+        std::stringstream ss;
+        ss << tab << "{";
+        ss << "\"" << normalize(src) << "\", ";
+        ss << x << "," << y << ", " << w << "," << h << ", ";
+        ss << u0 << "," << v0 << ", " << u1 << "," << v1 << ", ";
+        ss << rotate << ", " << std::hash<std::string>()(normalize(src));
+        if( options::ENABLE_CROPPING ) {
+        ss << ", " << left << ", " << right << ", " << top << ", " << bottom;
+        }
+        ss << "}," << std::endl;
+        return ss.str();
     }
 };
 
@@ -191,6 +207,7 @@ int help( const char **argv ) {
     std::cerr << std::string() + "\t--enable-edge          enables output blank pixel separator (default: disabled)\n";
     std::cerr << std::string() + "\t--enable-pot           enables output power-of-two texture (default: disabled)\n";
     std::cerr << std::string() + "\t--enable-mipmaps       enables mipmaps (default: disabled)\n";
+    std::cerr << std::string() + "\t--enable-c             enables flat c output instead of json\n";
     std::cerr << std::string() + "\t--enable-width WIDTH   enables minimum fixed width (in pixels) (default: 0)\n\n";
     std::cerr << "Notes:\n\tA JSON table of contents (toc) is written to stdout. Redirect it to a file if needed.\n\n";
 
@@ -243,6 +260,10 @@ int attila( int argc, const char **argv ) {
         else if( filename == "--enable-mipmaps") {
             list.erase( list.begin() + i );
             options::ENABLE_MIPMAPS = true;
+        }
+        else if( filename == "--enable-c") {
+            list.erase( list.begin() + i );
+            options::ENABLE_C_OUTPUT = true;
         }
         else if( filename == "--enable-width") {
             list.erase( list.begin() + i );
@@ -324,7 +345,7 @@ int attila( int argc, const char **argv ) {
     spot::image mega( width, height );
     //std::cerr << "[ OK ] Attila - Built " << width << 'x' << height << " texture...\n";
 
-    std::string ss, sep = "";
+    std::string ss, sep;
 
     for( int i = 0; i < textures.size(); ++i ) {
         //rects.push_back( mr.Insert( textures[i].w, textures[i].h, MaxRectsBinPack::RectBestShortSideFit ) );
@@ -334,12 +355,16 @@ int attila( int argc, const char **argv ) {
         int x, y, w, h;
         t.rotate = tp->getTextureLocation(i,x,y,w,h) ? 90 : 0;
         t.x = x; t.y = y;
-        t.u0 = float(  x) / width, t.u1 = float(  y) / height;
-        t.v0 = float(w+x) / width, t.v1 = float(h+y) / height;
+        t.u0 = float(  x) / width, t.v0 = float(  y) / height;
+        t.u1 = float(w+x) / width, t.v1 = float(h+y) / height;
         t.dst = output;
         
-        ss += sep + textures[i].json("\t");
-        sep = ",\n";
+        if( options::ENABLE_C_OUTPUT ) {
+            ss += sep + textures[i].c("\t");
+        } else {
+            ss += sep + textures[i].json("\t");
+            sep = ",\n";
+        }
 
 #if 0
         spot::image img;
@@ -356,7 +381,14 @@ int attila( int argc, const char **argv ) {
         mega.paste( mega, x, y, t.rotate ? img.rotate_left() : img );
     }
 
-    std::cout << "{\n" << ss << "\n}\n" << std::endl; 
+    if( options::ENABLE_C_OUTPUT ) {
+        std::string members = "const char *name; int w, h, x, y; double u0,v0, u1,v1; int rotate, hash; ";
+        std::string optional = options::ENABLE_CROPPING ? "int crop_left, crop_right, crop_top, crop_bottom; " : "";
+        std::cout << "// struct atlas_entry {" + members + optional + "} const atlas[] =" << std::endl;
+        std::cout << "{\n" << ss << "}\n" << std::endl; 
+    } else {
+        std::cout << "{\n" << ss << "\n}\n" << std::endl; 
+    }
 
     //std::cout << "mr = " << mr.Occupancy() << std::endl;
 
